@@ -1,25 +1,128 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template"
+author: "SGombar"
+date: "December 24, 2016"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+## Introduction
+
+This is SGombars solution to the week 2 project in the reporducible research course of the data science specialization.
+
+## Basic Data Descriptions
+1. Load essential libraries
+
+```{r libraries}
+library(ggplot2)
+```
+
+2. Load the activity.csv file assumed in the current working directory
+
+```{r getdata}
+dat <- read.csv("./activity.csv", header=TRUE, stringsAsFactors = TRUE)
+```
+
+3. Create a histogram of the total steps per day
+```{r sumDaySteps}
+allDaySums <- c()
+for (day in unique(dat$date)){
+  daySum <- sum(dat[dat$date == day,1], na.rm = TRUE)
+  allDaySums <- c(allDaySums, daySum)
+  
+}
+hist(allDaySums, main = "Historgram of total steps per day", xlab = "Total Steps Per Day")
+```
+
+4. Mean per day: `r mean(allDaySums)`  and Median per day : `r median(allDaySums)`
 
 
+5. Create a time series plot of average steps per time slot
+```{r averageIntervalSteps}
+allTimes <- c()
+for (timeSlot in unique(dat$interval)){
+  timeAverage <- mean(dat[dat$interval == timeSlot,1], na.rm = TRUE)
+  allTimes <- c(allTimes, timeAverage)
+}
+timeDF <- as.data.frame(cbind(unique(dat$interval), allTimes))
+colnames(timeDF) <- c("Interval","AverageSteps")
+ggplot(timeDF, aes(x=Interval, y=AverageSteps)) + geom_line()
+maxStepIntervalTime = timeDF[which.max(timeDF$AverageSteps),1]
 
-## What is mean total number of steps taken per day?
+```
 
 
+6. The interval with the maxium average steps is `r maxStepIntervalTime`.
 
-## What is the average daily activity pattern?
+## Dealing with missing data
+1. How much missing data?
+```{r TotalMissing}
+MissingValues <- sum(is.na(dat))
+```
+
+1. There is `r MissingValues` NA values within steps.
+2. Imputing Data Strategy:  Fill any NA values with the mean for the same interval (mean disregarding NAs).
+```{r ImputeMissing}
+impDat <- dat
+for(i in 1:nrow(dat)){
+  if(is.na(dat[i,1])){
+    impDat[i,1] <- timeDF[timeDF$Interval==impDat[i,3],2]
+  }
+}
+
+allImpDaySums <- c()
+for (day in unique(impDat$date)){
+  daySum <- sum(impDat[impDat$date == day,1], na.rm = TRUE)
+  allImpDaySums <- c(allImpDaySums, daySum)
+  
+}
+hist(allImpDaySums, main = "Historgram of total steps per day (Imputed Values)", xlab = "Total Steps Per Day")
+```
+
+3. Mean per day (imputed): `r mean(allImpDaySums)`  and Median per day (imputed): `r median(allImpDaySums)`
+
+4. The effect of this particular imputation is that it makes the distribution of daily total steps more normal. The mean and median are now roughly the same of total steps per day.  In addition it slighly increases the number of daily steps.
+
+## The effect of weekdays
+1. Add a field to all the imputed data points denoting weekend or weekday.
+```{r Weekend}
+isWeekend <- vector(mode="character", length=nrow(impDat))
+for(i in 1:nrow(impDat)){
+  if(weekdays(as.Date(impDat[i,2])) %in% c("Saturday","Sunday")){
+    isWeekend[i] <- "Weekend"
+  } else {
+    isWeekend[i] <- "Weekday"
+  }
+}
+
+impDat$isWeekend <- as.factor(isWeekend)
+
+```
+
+2. Now using the weekend information create a new time series for weekend and weekday and plot them.
+``` {r WeekendTimePlots}
+weekdayDat <- impDat[impDat$isWeekend=="Weekday",]
+allWeekdayTimes <- c()
+for (timeSlot in unique(weekdayDat$interval)){
+  timeAverage <- mean(weekdayDat[weekdayDat$interval == timeSlot,1], na.rm = TRUE)
+  allWeekdayTimes <- c(allWeekdayTimes, timeAverage)
+}
+timeDF <- as.data.frame(cbind(unique(weekdayDat$interval), allWeekdayTimes))
 
 
+weekendDat <- impDat[impDat$isWeekend=="Weekend",]
+allWeekendTimes <- c()
+for (timeSlot in unique(weekendDat$interval)){
+  timeAverage <- mean(weekendDat[weekendDat$interval == timeSlot,1], na.rm = TRUE)
+  allWeekendTimes <- c(allWeekendTimes, timeAverage)
+}
+timeDF <- cbind(timeDF, allWeekendTimes)
+colnames(timeDF) <- c("Interval","Weekday","Weekend")
 
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+par(mfrow=c(2,1))
+plot(timeDF$Interval, timeDF$Weekday, type = 'l', ylab = "Average Steps", xlab = "Interval", main = "Weekday")
+plot(timeDF$Interval, timeDF$Weekend, type = 'l', ylab = "Average Steps", xlab = "Interval", main = "Weekend")
+```
